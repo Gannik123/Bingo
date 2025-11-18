@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bingo</title>
+
+<style>
+    body {
+        font-family: "Inter", Arial, sans-serif;
+        background: #1b1b1b; /* темний фон */
+        color: #f2f2f2;
+        margin: 0;
+        padding: 15px;
+    }
+
+    h1 {
+        text-align: center;
+        margin-bottom: 20px;
+        font-weight: 700;
+        color: #ffa94d; /* помаранчевий */
+    }
+
+    /* Панель */
+    .controls {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+    }
+
+    input {
+        flex: 1;
+        min-width: 200px;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid #555;
+        font-size: 16px;
+        background: #2c2c2c;
+        color: #ffa94d;
+    }
+
+    button {
+        padding: 12px 15px;
+        border: none;
+        border-radius: 12px;
+        background: #ffa94d;
+        color: #000;
+        cursor: pointer;
+        font-size: 15px;
+        font-weight: 600;
+    }
+
+    button:hover {
+        background: #ff9233;
+    }
+
+    /* Контейнер */
+    #bingo {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: center;
+        padding-bottom: 40px;
+    }
+
+    .cell-box {
+        background: #2a2a2a;
+        width: calc(30% - 12px);
+        min-width: 110px;
+        border-radius: 14px;
+        padding: 10px;
+        position: relative;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+        transition: 0.2s;
+    }
+
+    /* Видалення */
+    .delete-btn {
+        position: absolute;
+        right: 8px;
+        top: 6px;
+        cursor: pointer;
+        font-size: 20px;
+        color: #ff6b6b;
+    }
+
+    .delete-btn:active {
+        color: #ff3c3c;
+        transform: scale(2.0);
+    }
+
+    /* Клітинка */
+    .cell {
+        background: #3a3a3a;
+        border-radius: 10px;
+        padding: 25px 10px;
+        color: #ffa94d;
+
+        /* height: 100%; */
+        min-height: 100px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        text-align: center;
+        cursor: pointer;
+        user-select: none;
+        font-size: 15px;
+        font-weight: 600;
+        transition: 0.25s;
+    }
+
+    .cell.active {
+        background: #ff9800;
+        color: #000;
+        transform: scale(1.05);
+        box-shadow: 5px 5px 30px rgb(247, 101, 4);
+    }
+    #resetBtn{
+        background-color: #f05146;
+    }
+    #addBtn{
+        background-color: #45cb62;
+    }
+
+    .delete-btn {
+        transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .delete-btn.clicked {
+        transform: scale(0.7);
+        opacity: 0.4;
+    }
+    @media(max-width:515px){
+        #bingo{
+            gap: 0;
+        }
+    }
+</style>
+</head>
+<body>
+
+<h1>🔥 Bingo 🍻</h1>
+
+<div class="controls">
+    <input type="text" id="newItem" placeholder="Добавить событие...">
+    <button id="addBtn">Добавить</button>
+    <button id="resetBtn">Сбросить</button>
+</div>
+
+<div id="bingo"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+<script>
+
+/* ---------------- Дані ---------------- */
+
+let items = JSON.parse(localStorage.getItem("bingoItems")) || [
+    { text: "Пошли Света", checked: false },
+    { text: "Взять посохи", checked: false },
+    { text: "Закапаться", checked: false },
+    { text: "Танцы", checked: false },
+    { text: "Давай по второму", checked: false },
+    { text: "Колонка с собой each", checked: false },
+    { text: "Не подключается колонка", checked: false },
+    { text: "Какое пиво выпил?", checked: false },
+    { text: "Пошли Света ×5", checked: false },
+    { text: "Включить Алину", checked: false },
+    { text: "Фукнуть", checked: false },
+    { text: "Чокнуться под песню", checked: false },
+    { text: "Я думала сова", checked: false },
+    { text: "Забыл о чем говорил", checked: false },
+    { text: "Не подкурилась сигa", checked: false },
+    { text: "Где моя зажигалка?", checked: false },
+    { text: "Забыть закапаться", checked: false }
+];
+
+let triggeredLines = JSON.parse(localStorage.getItem("triggeredLines")) || { rows: [], cols: [] };
+
+/* ---------------- Рендер ---------------- */
+
+function render() {
+    const container = document.getElementById("bingo");
+    container.innerHTML = "";
+
+    items.forEach((item, index) => {
+        const box = document.createElement("div");
+        box.className = "cell-box";
+
+        const cell = document.createElement("div");
+        cell.className = "cell" + (item.checked ? " active" : "");
+        cell.textContent = item.text;
+
+        cell.onclick = () => {
+            items[index].checked = !items[index].checked;
+            save();
+            render();
+            checkBingo();
+        };
+
+        const del = document.createElement("div");
+        del.className = "delete-btn";
+        del.textContent = "🗑";
+
+        del.onclick = (e) => {
+            e.stopPropagation();
+
+            // додаємо ефект натискання
+            del.classList.add("clicked");
+
+            setTimeout(() => {
+                items.splice(index, 1);
+                save();
+                render();
+            }, 150);
+        };
+
+        box.appendChild(cell);
+        box.appendChild(del);
+        container.appendChild(box);
+    });
+}
+
+function save() {
+    localStorage.setItem("bingoItems", JSON.stringify(items));
+}
+
+/* ---------------- Бінго (ФІКС) ---------------- */
+
+function checkBingo() {
+    const rowLength = 3;
+    const total = items.length;
+    const rows = Math.ceil(total / rowLength);
+
+    // Горизонталі
+    for (let r = 0; r < rows; r++) {
+
+        // Якщо вже було конфеті — пропускаємо
+        if (triggeredLines.rows.includes(r)) continue;
+
+        let row = items.slice(r * rowLength, (r + 1) * rowLength);
+
+        if (row.length === 3 && row.every(i => i.checked)) {
+            launchConfetti();
+            triggeredLines.rows.push(r);
+            saveTriggers();
+            return;
+        }
+    }
+
+    // Вертикалі
+    for (let c = 0; c < rowLength; c++) {
+
+        if (triggeredLines.cols.includes(c)) continue;
+
+        let col = [];
+        for (let r = 0; r < rows; r++) {
+            let idx = r * rowLength + c;
+            if (items[idx]) col.push(items[idx]);
+        }
+
+        if (col.length === 3 && col.every(i => i.checked)) {
+            launchConfetti();
+            triggeredLines.cols.push(c);
+            saveTriggers();
+            return;
+        }
+    }
+}
+
+/* ---------------- Конфеті ---------------- */
+
+function launchConfetti() {
+    confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.3 }
+    });
+}
+
+/* ---------------- Додавання ---------------- */
+
+document.getElementById("addBtn").onclick = () => {
+    const input = document.getElementById("newItem");
+    const text = input.value.trim();
+    if (!text) return;
+
+    items.push({ text, checked: false });
+    input.value = "";
+    save();
+    render();
+};
+
+function saveTriggers() {
+    localStorage.setItem("triggeredLines", JSON.stringify(triggeredLines));
+}
+
+/* ---------------- Скидання ---------------- */
+
+document.getElementById("resetBtn").onclick = () => {
+    items = items.map(i => ({ ...i, checked: false }));
+    triggeredLines = { rows: [], cols: [] };
+    save();
+    saveTriggers();
+    render();
+};
+
+render();
+
+</script>
+</body>
+</html>
